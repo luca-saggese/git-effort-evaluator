@@ -160,7 +160,7 @@ function splitIntoSegments(commits) {
   });
 }
 
-function buildDailySeries(commits) {
+function buildDailySeries(commits, segments) {
   const byDay = new Map();
 
   for (const c of commits) {
@@ -180,13 +180,53 @@ function buildDailySeries(commits) {
     byDay.set(day, row);
   }
 
-  return Array.from(byDay.values()).sort((a, b) => a.day.localeCompare(b.day));
+  const hoursByDay = new Map();
+  for (const s of segments) {
+    const day = new Date(s.endTime * 1000).toISOString().slice(0, 10);
+    hoursByDay.set(day, (hoursByDay.get(day) || 0) + s.durationHours);
+  }
+
+  for (const [day, hours] of hoursByDay.entries()) {
+    const row = byDay.get(day) || {
+      day,
+      commits: 0,
+      additions: 0,
+      deletions: 0,
+      filesChanged: 0,
+    };
+
+    row.hours = hours;
+    row.manDays = hours / CONFIG.hoursPerManDay;
+    byDay.set(day, row);
+  }
+
+  for (const row of byDay.values()) {
+    if (typeof row.hours !== "number") {
+      row.hours = 0;
+      row.manDays = 0;
+    }
+  }
+
+  return Array.from(byDay.values())
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .map((row) => ({
+      ...row,
+      dayLabel: formatDayLabel(row.day),
+    }));
 }
 
 function formatDateTimeFromSec(epochSec) {
   return new Date(epochSec * 1000).toLocaleString("it-IT", {
     dateStyle: "medium",
     timeStyle: "short",
+  });
+}
+
+function formatDateFromSec(epochSec) {
+  return new Date(epochSec * 1000).toLocaleDateString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 }
 
@@ -205,6 +245,16 @@ function formatDecimal(n, fractionDigits = 2) {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(n);
+}
+
+function formatDayLabel(dayIso) {
+  const [year, month, day] = dayIso.split("-").map(Number);
+  const weekdays = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+  const months = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const yearShort = String(year).slice(2);
+
+  return `${weekdays[weekday]} ${day} ${months[month - 1]} '${yearShort}`;
 }
 
 function buildReportHtml(report) {
@@ -327,12 +377,15 @@ function buildReportHtml(report) {
     <div class="subtitle">Analisi repository: ${report.repoRoot}</div>
     <div class="grid">
       <div class="card"><div class="kpi-label">Commit</div><div class="kpi-value">${formatInt(report.totals.commits)}</div></div>
-      <div class="card"><div class="kpi-label">Segmenti Sviluppo</div><div class="kpi-value">${formatInt(report.totals.segments)}</div></div>
-      <div class="card"><div class="kpi-label">File Toccati</div><div class="kpi-value">${formatInt(report.totals.filesChanged)}</div></div>
+      <div class="card"><div class="kpi-label">Primo Commit</div><div class="kpi-value">${report.totals.firstCommitDate}</div></div>
+      <div class="card"><div class="kpi-label">Ultimo Commit</div><div class="kpi-value">${report.totals.lastCommitDate}</div></div>
+      <div class="card"><div class="kpi-label">Giorni Attivi</div><div class="kpi-value">${formatInt(report.daily.length)}</div></div>
+      <div class="card"><div class="kpi-label">File Modificati</div><div class="kpi-value">${formatInt(report.totals.filesChanged)}</div></div>
       <div class="card"><div class="kpi-label">Righe Scritte</div><div class="kpi-value">${formatInt(report.totals.additions)}</div></div>
       <div class="card"><div class="kpi-label">Righe Cancellate</div><div class="kpi-value">${formatInt(report.totals.deletions)}</div></div>
       <div class="card"><div class="kpi-label">Ore Uomo</div><div class="kpi-value">${formatDecimal(report.totals.hours)}</div></div>
       <div class="card"><div class="kpi-label">Giorni Uomo</div><div class="kpi-value">${formatDecimal(report.totals.manDays)}</div></div>
+      <div class="card"><div class="kpi-label">Elapsed Totale (gg)</div><div class="kpi-value">${formatDecimal(report.totals.elapsedDays)}</div></div>
     </div>
 
     <div class="panel">
@@ -341,28 +394,26 @@ function buildReportHtml(report) {
     </div>
 
     <div class="panel">
-      <h2>Dettaglio Segmenti</h2>
+      <h2>Ore Aggregate per Giorno</h2>
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Inizio (warmup incluso)</th>
-            <th>Fine</th>
+            <th>Giorno</th>
             <th>Commit</th>
+            <th>File Toccati</th>
             <th>Ore</th>
             <th>Giorni Uomo</th>
           </tr>
         </thead>
         <tbody>
-          ${report.segments
+          ${report.daily
             .map(
-              (s) => `<tr>
-                <td>${s.id}</td>
-                <td>${formatDateTimeFromSec(s.startTime)}</td>
-                <td>${formatDateTimeFromSec(s.endTime)}</td>
-                <td>${formatInt(s.commitCount)}</td>
-                <td>${formatDecimal(s.durationHours)}</td>
-                <td>${formatDecimal(s.durationManDays)}</td>
+              (d) => `<tr>
+                <td>${d.dayLabel}</td>
+                <td>${formatInt(d.commits)}</td>
+                <td>${formatInt(d.filesChanged)}</td>
+                <td>${formatDecimal(d.hours)}</td>
+                <td>${formatDecimal(d.manDays)}</td>
               </tr>`
             )
             .join("")}
@@ -379,23 +430,11 @@ function buildReportHtml(report) {
   <script>
     const report = JSON.parse(document.getElementById("report-data").textContent);
 
-    const labels = report.daily.map((d) => d.day);
+    const labels = report.daily.map((d) => d.dayLabel);
     const additions = report.daily.map((d) => d.additions);
     const deletions = report.daily.map((d) => d.deletions);
 
-    let cumulativeHours = 0;
-    const cumulativeByDay = [];
-    const segmentByDay = new Map();
-
-    for (const segment of report.segments) {
-      const day = new Date(segment.endTime * 1000).toISOString().slice(0, 10);
-      segmentByDay.set(day, (segmentByDay.get(day) || 0) + segment.durationHours);
-    }
-
-    for (const day of labels) {
-      cumulativeHours += segmentByDay.get(day) || 0;
-      cumulativeByDay.push(Number(cumulativeHours.toFixed(2)));
-    }
+    const hoursByDay = report.daily.map((d) => Number(d.hours.toFixed(2)));
 
     const ctx = document.getElementById("timelineChart");
     new Chart(ctx, {
@@ -422,8 +461,8 @@ function buildReportHtml(report) {
           },
           {
             type: "line",
-            label: "Ore Uomo Cumulative",
-            data: cumulativeByDay,
+            label: "Ore Uomo / Giorno",
+            data: hoursByDay,
             yAxisID: "y1",
             borderColor: "rgba(63, 125, 76, 1)",
             backgroundColor: "rgba(63, 125, 76, 0.2)",
@@ -452,7 +491,7 @@ function buildReportHtml(report) {
           tooltip: {
             callbacks: {
               label(context) {
-                const isHours = context.dataset.label === "Ore Uomo Cumulative";
+                const isHours = context.dataset.label === "Ore Uomo / Giorno";
                 const value = context.parsed.y;
                 const formatted = isHours
                   ? new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
@@ -537,15 +576,18 @@ function main() {
 
   const totals = {
     commits: commits.length,
+    firstCommitDate: formatDateFromSec(commits[0].timestamp),
+    lastCommitDate: formatDateFromSec(commits[commits.length - 1].timestamp),
     segments: segments.length,
     filesChanged: commits.reduce((acc, c) => acc + c.filesChanged, 0),
     additions: commits.reduce((acc, c) => acc + c.additions, 0),
     deletions: commits.reduce((acc, c) => acc + c.deletions, 0),
     hours: segments.reduce((acc, s) => acc + s.durationHours, 0),
     manDays: segments.reduce((acc, s) => acc + s.durationManDays, 0),
+    elapsedDays: (commits[commits.length - 1].timestamp - commits[0].timestamp) / 86400,
   };
 
-  const daily = buildDailySeries(commits);
+  const daily = buildDailySeries(commits, segments);
 
   const report = {
     projectName,
