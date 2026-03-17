@@ -1,0 +1,18 @@
+{
+  "name": "git-effort-evaluator",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": {
+    "git-stats": "./bin/git-stats"
+  },
+  "scripts": {
+    "build:bin": "mkdir -p ./bin && cp ./scripts/git-stats.js ./bin/git-stats && chmod +x ./bin/git-stats",
+    "git-stats": "npm run build:bin && ./bin/git-stats",
+    "install": "npm run build:bin && DEST=\"${LOCAL_BIN:-$( [ -d /opt/homebrew/bin ] && echo /opt/homebrew/bin || echo /usr/local/bin )}\" && cp ./bin/git-stats \"$DEST/git-stats\" && chmod +x \"$DEST/git-stats\" && echo \"Installato in $DEST/git-stats\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
