@@ -588,6 +588,7 @@ function main() {
     console.error("Errore: esegui il comando all'interno di un repository Git.");
     process.exit(1);
   }
+  console.log("Analisi repository in corso...");
 
   const repoRoot = getRepoRoot(cwd);
   const projectName = getProjectName(repoRoot);
