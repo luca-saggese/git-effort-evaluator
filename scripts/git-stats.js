@@ -376,7 +376,7 @@ function buildReportHtml(report) {
     <h1>${report.projectName}</h1>
     <div class="subtitle">Analisi repository: ${report.repoRoot}</div>
     <div class="grid">
-      <div class="card"><div class="kpi-label">Commit</div><div class="kpi-value">${formatInt(report.totals.commits)}</div></div>
+      <div class="card"><div class="kpi-label"># Commit</div><div class="kpi-value">${formatInt(report.totals.commits)}</div></div>
       <div class="card"><div class="kpi-label">Primo Commit</div><div class="kpi-value">${report.totals.firstCommitDate}</div></div>
       <div class="card"><div class="kpi-label">Ultimo Commit</div><div class="kpi-value">${report.totals.lastCommitDate}</div></div>
       <div class="card"><div class="kpi-label">Giorni Attivi</div><div class="kpi-value">${formatInt(report.daily.length)}</div></div>
