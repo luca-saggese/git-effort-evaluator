@@ -8,6 +8,7 @@ const CONFIG = {
   segmentGapMinutes: 60,
   warmupMinutes: 30,
   hoursPerManDay: 8,
+  maxChartDays: 30,
   outputPath: "/tmp/git-stats-report.html",
   autoOpenReport: true,
   gitLogMaxBufferBytes: 50 * 1024 * 1024,
@@ -213,6 +214,35 @@ function buildDailySeries(commits, segments) {
       ...row,
       dayLabel: formatDayLabel(row.day),
     }));
+}
+
+function buildChartSeriesFromDaily(daily, maxPoints) {
+  if (daily.length <= maxPoints) {
+    return daily.map((d) => ({
+      label: d.dayLabel,
+      additions: d.additions,
+      deletions: d.deletions,
+      hours: d.hours,
+    }));
+  }
+
+  const bucketSize = Math.ceil(daily.length / maxPoints);
+  const buckets = [];
+
+  for (let i = 0; i < daily.length; i += bucketSize) {
+    const slice = daily.slice(i, i + bucketSize);
+    const first = slice[0];
+    const last = slice[slice.length - 1];
+
+    buckets.push({
+      label: `${first.dayLabel} -> ${last.dayLabel}`,
+      additions: slice.reduce((acc, d) => acc + d.additions, 0),
+      deletions: slice.reduce((acc, d) => acc + d.deletions, 0),
+      hours: slice.reduce((acc, d) => acc + d.hours, 0),
+    });
+  }
+
+  return buckets;
 }
 
 function formatDateTimeFromSec(epochSec) {
@@ -422,7 +452,7 @@ function buildReportHtml(report) {
     </div>
 
     <div class="footer">
-      Generato il ${new Date().toLocaleString("it-IT")}. Parametri: gap=${CONFIG.segmentGapMinutes}m, warmup=${CONFIG.warmupMinutes}m, ore/giorno=${CONFIG.hoursPerManDay}.
+      Generato il ${new Date().toLocaleString("it-IT")}. Parametri: gap=${CONFIG.segmentGapMinutes}m, warmup=${CONFIG.warmupMinutes}m, ore/giorno=${CONFIG.hoursPerManDay}, max punti grafico=${CONFIG.maxChartDays}.
     </div>
   </div>
 
@@ -430,11 +460,11 @@ function buildReportHtml(report) {
   <script>
     const report = JSON.parse(document.getElementById("report-data").textContent);
 
-    const labels = report.daily.map((d) => d.dayLabel);
-    const additions = report.daily.map((d) => d.additions);
-    const deletions = report.daily.map((d) => d.deletions);
+    const labels = report.chartDaily.map((d) => d.label);
+    const additions = report.chartDaily.map((d) => d.additions);
+    const deletions = report.chartDaily.map((d) => d.deletions);
 
-    const hoursByDay = report.daily.map((d) => Number(d.hours.toFixed(2)));
+    const hoursByDay = report.chartDaily.map((d) => Number(d.hours.toFixed(2)));
 
     const ctx = document.getElementById("timelineChart");
     new Chart(ctx, {
@@ -588,6 +618,7 @@ function main() {
   };
 
   const daily = buildDailySeries(commits, segments);
+  const chartDaily = buildChartSeriesFromDaily(daily, CONFIG.maxChartDays);
 
   const report = {
     projectName,
@@ -596,6 +627,7 @@ function main() {
     config: CONFIG,
     totals,
     daily,
+    chartDaily,
     segments,
   };
 
