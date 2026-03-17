@@ -90,6 +90,11 @@ function getCommits(repoRoot) {
       continue;
     }
 
+    const filePath = match[3];
+    if (filePath.includes("node_modules/")) {
+      continue;
+    }
+
     const added = match[1] === "-" ? 0 : Number(match[1]);
     const deleted = match[2] === "-" ? 0 : Number(match[2]);
 
@@ -187,6 +192,19 @@ function formatDateTimeFromSec(epochSec) {
 
 function toFixed2(n) {
   return (Math.round(n * 100) / 100).toFixed(2);
+}
+
+function formatInt(n) {
+  return new Intl.NumberFormat("it-IT", {
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function formatDecimal(n, fractionDigits = 2) {
+  return new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(n);
 }
 
 function buildReportHtml(report) {
@@ -308,13 +326,13 @@ function buildReportHtml(report) {
     <h1>${report.projectName}</h1>
     <div class="subtitle">Analisi repository: ${report.repoRoot}</div>
     <div class="grid">
-      <div class="card"><div class="kpi-label">Commit</div><div class="kpi-value">${report.totals.commits}</div></div>
-      <div class="card"><div class="kpi-label">Segmenti Sviluppo</div><div class="kpi-value">${report.totals.segments}</div></div>
-      <div class="card"><div class="kpi-label">File Toccati</div><div class="kpi-value">${report.totals.filesChanged}</div></div>
-      <div class="card"><div class="kpi-label">Righe Scritte</div><div class="kpi-value">${report.totals.additions}</div></div>
-      <div class="card"><div class="kpi-label">Righe Cancellate</div><div class="kpi-value">${report.totals.deletions}</div></div>
-      <div class="card"><div class="kpi-label">Ore Uomo</div><div class="kpi-value">${toFixed2(report.totals.hours)}</div></div>
-      <div class="card"><div class="kpi-label">Giorni Uomo</div><div class="kpi-value">${toFixed2(report.totals.manDays)}</div></div>
+      <div class="card"><div class="kpi-label">Commit</div><div class="kpi-value">${formatInt(report.totals.commits)}</div></div>
+      <div class="card"><div class="kpi-label">Segmenti Sviluppo</div><div class="kpi-value">${formatInt(report.totals.segments)}</div></div>
+      <div class="card"><div class="kpi-label">File Toccati</div><div class="kpi-value">${formatInt(report.totals.filesChanged)}</div></div>
+      <div class="card"><div class="kpi-label">Righe Scritte</div><div class="kpi-value">${formatInt(report.totals.additions)}</div></div>
+      <div class="card"><div class="kpi-label">Righe Cancellate</div><div class="kpi-value">${formatInt(report.totals.deletions)}</div></div>
+      <div class="card"><div class="kpi-label">Ore Uomo</div><div class="kpi-value">${formatDecimal(report.totals.hours)}</div></div>
+      <div class="card"><div class="kpi-label">Giorni Uomo</div><div class="kpi-value">${formatDecimal(report.totals.manDays)}</div></div>
     </div>
 
     <div class="panel">
@@ -342,9 +360,9 @@ function buildReportHtml(report) {
                 <td>${s.id}</td>
                 <td>${formatDateTimeFromSec(s.startTime)}</td>
                 <td>${formatDateTimeFromSec(s.endTime)}</td>
-                <td>${s.commitCount}</td>
-                <td>${toFixed2(s.durationHours)}</td>
-                <td>${toFixed2(s.durationManDays)}</td>
+                <td>${formatInt(s.commitCount)}</td>
+                <td>${formatDecimal(s.durationHours)}</td>
+                <td>${formatDecimal(s.durationManDays)}</td>
               </tr>`
             )
             .join("")}
@@ -431,17 +449,39 @@ function buildReportHtml(report) {
           legend: {
             position: "bottom",
           },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const isHours = context.dataset.label === "Ore Uomo Cumulative";
+                const value = context.parsed.y;
+                const formatted = isHours
+                  ? new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+                  : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(value);
+                return context.dataset.label + ": " + formatted;
+              },
+            },
+          },
         },
         scales: {
           y: {
             beginAtZero: true,
             title: { display: true, text: "Righe" },
+            ticks: {
+              callback(value) {
+                return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(value);
+              },
+            },
           },
           y1: {
             beginAtZero: true,
             position: "right",
             grid: { drawOnChartArea: false },
             title: { display: true, text: "Ore Uomo" },
+            ticks: {
+              callback(value) {
+                return new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+              },
+            },
           },
         },
       },
