@@ -7,6 +7,7 @@ const { execSync } = require("child_process");
 const CONFIG = {
   segmentGapMinutes: 60,
   warmupMinutes: 30,
+  firstCommitExtraHours: 1,
   hoursPerManDay: 8,
   maxChartDays: 30,
   outputPath: "/tmp/git-stats-report.html",
@@ -147,7 +148,9 @@ function splitIntoSegments(commits) {
   return segments.map((s, idx) => {
     const startTime = s.firstCommitTime - CONFIG.warmupMinutes * 60;
     const endTime = s.lastCommitTime;
-    const durationHours = Math.max(0, (endTime - startTime) / 3600);
+    const baseDurationHours = Math.max(0, (endTime - startTime) / 3600);
+    const extraFirstCommitHours = s.startCommitIndex === 0 ? CONFIG.firstCommitExtraHours : 0;
+    const durationHours = baseDurationHours + extraFirstCommitHours;
 
     return {
       id: idx + 1,
@@ -452,7 +455,7 @@ function buildReportHtml(report) {
     </div>
 
     <div class="footer">
-      Generato il ${new Date().toLocaleString("it-IT")}. Parametri: gap=${CONFIG.segmentGapMinutes}m, warmup=${CONFIG.warmupMinutes}m, ore/giorno=${CONFIG.hoursPerManDay}, max punti grafico=${CONFIG.maxChartDays}.
+      Generato il ${new Date().toLocaleString("it-IT")}. Parametri: gap=${CONFIG.segmentGapMinutes}m, warmup=${CONFIG.warmupMinutes}m, extra primo commit=${CONFIG.firstCommitExtraHours}h, ore/giorno=${CONFIG.hoursPerManDay}, max punti grafico=${CONFIG.maxChartDays}.
     </div>
   </div>
 
