@@ -2,6 +2,10 @@
 
 Tool CLI Node.js che analizza la cronologia Git di un repository e genera un report HTML con metriche di effort (ore uomo, giorni uomo, attività giornaliera, righe modificate).
 
+## Screenshot
+
+![Screenshot del report](./Screenshot.png)
+
 ## Requisiti
 
 - Node.js (versione recente)
